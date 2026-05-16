@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>Mesa Dungeon Sandbox</title>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/cannon.js"></script>
+
+  <style>
+
+    body{
+      margin:0;
+      overflow:hidden;
+      background:transparent;
+      font-family:Arial;
+    }
+
+    #ui{
+      position:absolute;
+      top:15px;
+      left:15px;
+      z-index:10;
+      display:flex;
+      gap:10px;
+    }
+
+    button{
+      background:#3A2A12;
+      color:#F0E6D3;
+      border:none;
+      padding:10px 14px;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:14px;
+    }
+
+    button:hover{
+      background:#5A3F1D;
+    }
+
+    canvas{
+      width:100vw;
+      height:100vh;
+      display:block;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<div id="ui">
+
+  <button onclick="spawnD20()">
+    🎲 Tirar D20
+  </button>
+
+  <button onclick="spawnD6()">
+    🎲 Tirar D6
+  </button>
+
+</div>
+
+<canvas id="renderCanvas"></canvas>
+
+<script>
+
+const canvas = document.getElementById("renderCanvas");
+
+const engine = new BABYLON.Engine(canvas,true);
+
+const scene = new BABYLON.Scene(engine);
+  scene.enablePhysics(
+  new BABYLON.Vector3(0,-5,0),
+  new BABYLON.CannonJSPlugin()
+);
+
+scene.clearColor = new BABYLON.Color4(0,0,0,0);
+
+const camera =
+  new BABYLON.FreeCamera(
+    "camera",
+    new BABYLON.Vector3(
+      0,
+      18,
+      0
+    ),
+    scene
+  );
+
+camera.rotation.x = Math.PI / 2;
+
+const hemi = new BABYLON.HemisphericLight(
+  "hemi",
+  new BABYLON.Vector3(0,1,0),
+  scene
+);
+
+hemi.intensity = 0.35;
+
+const point = new BABYLON.PointLight(
+  "point",
+  new BABYLON.Vector3(0,8,0),
+  scene
+);
+
+point.intensity = 35;
+  const shadowGenerator =
+  new BABYLON.ShadowGenerator(
+    1024,
+    point
+  );
+
+shadowGenerator.useBlurExponentialShadowMap = true;
+
+shadowGenerator.blurKernel = 32;
+point.diffuse = new BABYLON.Color3(1,0.75,0.45);
+
+const ground = BABYLON.MeshBuilder.CreateGround(
+  "ground",
+  {
+    width:32,
+    height:20
+  },
+  scene
+);
+
+ground.position.y = -2;
+
+const groundMat = new BABYLON.StandardMaterial(
+  "groundMat",
+  scene
+);
+
+groundMat.diffuseColor =
+  new BABYLON.Color3(0.10,0.06,0.03);
+  
+groundMat.specularColor =
+  new BABYLON.Color3(0,0,0);
+  
+ground.material = groundMat;
+  ground.isVisible = false;
+  ground.receiveShadows = true;
+  groundMat.diffuseTexture =
+  new BABYLON.Texture(
+    "assets/table.jpg",
+    scene
+  );
+
+ground.physicsImpostor =
+  new BABYLON.PhysicsImpostor(
+    ground,
+    BABYLON.PhysicsImpostor.BoxImpostor,
+    {
+      mass:0,
+      restitution:0.4,
+      friction:0.8
+    },
+    scene
+  );
+
+function createWall(x,z,w,h){
+
+  const wall =
+    BABYLON.MeshBuilder.CreateBox(
+      "wall",
+      {
+        width:w,
+        height:2,
+        depth:h
+      },
+      scene
+    );
+
+  wall.position.x = x;
+  wall.position.y = -1;
+  wall.position.z = z;
+
+  wall.isVisible = false;
+
+  wall.physicsImpostor =
+    new BABYLON.PhysicsImpostor(
+      wall,
+      BABYLON.PhysicsImpostor.BoxImpostor,
+      {
+        mass:0,
+        restitution:0.2
+      },
+      scene
+    );
+}
+
+createWall(-14,0,1,20);
+createWall(14,0,1,20);
+createWall(0,-6,20,1);
+createWall(0,6,20,1);
+
+function createDie(type="d20"){
+
+  let die;
+
+  if(type === "d6"){
+
+    die = BABYLON.MeshBuilder.CreateBox(
+      "d6",
+      {
+        size:1.4
+      },
+      scene
+    );
+
+  }else{
+
+    die = BABYLON.MeshBuilder.CreatePolyhedron(
+      "d20",
+      {
+        type:3,
+        size:0.9
+      },
+      scene
+    );
+  }
+
+  const fromLeft =
+      Math.random() > 0.5;
+
+  die.position.x =
+     fromLeft ? -12 : 12;
+
+  die.position.y = 4;
+
+  die.position.z =
+     (Math.random()-0.5)*1.5
+
+  const mat = new BABYLON.StandardMaterial(
+    "mat",
+    scene
+  );
+
+  mat.diffuseTexture =
+  new BABYLON.Texture(
+    "assets/metal.jpg",
+    scene
+  );
+
+  mat.emissiveColor =
+    new BABYLON.Color3(0.15,0.1,0.03);
+ 
+  die.material = mat;
+  shadowGenerator.addShadowCaster(die);
+
+  die.physicsImpostor =
+  new BABYLON.PhysicsImpostor(
+    die,
+    BABYLON.PhysicsImpostor.BoxImpostor,
+    {
+      mass:1,
+      restitution:0.25,
+      friction:1.4
+    },
+    scene
+  );
+
+die.physicsImpostor.physicsBody.linearDamping = 0.45;
+
+die.physicsImpostor.physicsBody.angularDamping = 0.55;
+
+die.physicsImpostor.applyImpulse(
+
+  new BABYLON.Vector3(
+
+    fromLeft
+      ? 1.2 + Math.random()*0.8
+      : -1.2 - Math.random()*0.8,
+
+    0,
+
+    (Math.random()-0.5)*0.08
+
+  ),
+
+  die.getAbsolutePosition()
+
+);
+
+die.physicsImpostor.setAngularVelocity(
+
+  new BABYLON.Vector3(
+    Math.random()*8,
+    Math.random()*8,
+    Math.random()*8
+  )
+
+);
+
+  let velocity = 0.12 + Math.random()*0.08;
+
+  const obs = scene.onBeforeRenderObservable.add(()=>{
+
+    
+
+    die.position.y -= velocity;
+    die.position.x +=
+      0.08 + Math.random()*0.08;
+    die.position.z +=
+      (Math.random()-0.5)*0.04;
+
+    if(die.position.y <= -1.2){
+
+      die.position.y = -1.2;
+
+      velocity *= -0.45;
+
+      if(Math.abs(velocity) < 0.01){
+
+        velocity = 0;
+
+        scene.onBeforeRenderObservable.remove(obs);
+
+      }
+    }
+
+    velocity += 0.003;
+
+    const vel =
+  die.physicsImpostor.physicsBody.velocity;
+
+if(
+  vel &&
+  Math.abs(vel.x) < 0.15 &&
+  Math.abs(vel.y) < 0.15 &&
+  Math.abs(vel.z) < 0.15
+){
+
+  die.physicsImpostor.sleep();
+
+}
+
+  });
+
+  return die;
+}
+
+function spawnD20(){
+
+  createDie("d20");
+
+}
+
+function spawnD6(){
+
+  createDie("d6");
+
+}
+
+engine.runRenderLoop(()=>{
+
+  scene.render();
+
+});
+
+window.addEventListener("resize",()=>{
+
+  engine.resize();
+
+});
+
+</script>
+
+</body>
+</html>
